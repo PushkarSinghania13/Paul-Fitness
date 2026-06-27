@@ -1,0 +1,175 @@
+{
+  "app_name": "Paul Fitness App",
+  "personality": "7 Dark-First Utility DARK",
+  "personality_one_liner": "A bold, operational command-center that feels athletic, durable, and performance-oriented with sharp typography and high-contrast red accents.",
+  "color": {
+    "surface": "#121212",
+    "onSurface": "#FFFFFF",
+    "surfaceSecondary": "#1E1E1E",
+    "onSurfaceSecondary": "#E0E0E0",
+    "surfaceTertiary": "#2C2C2C",
+    "onSurfaceTertiary": "#CCCCCC",
+    "surfaceInverse": "#FFFFFF",
+    "onSurfaceInverse": "#121212",
+    "brand": "#D72638",
+    "brandPrimary": "#D72638",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#FF4D4D",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#4A1519",
+    "onBrandTertiary": "#FF4D4D",
+    "success": "#2E7D32",
+    "onSuccess": "#FFFFFF",
+    "warning": "#F57F17",
+    "onWarning": "#FFFFFF",
+    "error": "#C62828",
+    "onError": "#FFFFFF",
+    "info": "#0277BD",
+    "onInfo": "#FFFFFF",
+    "border": "#2C2C2C",
+    "borderStrong": "#444444",
+    "divider": "#2C2C2C"
+  },
+  "typography": {
+    "displayFontFamily": "Bebas Neue",
+    "textFontFamily": "DM Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Dense, utilitarian spacing. Use tight paddings for operational screens. Dividers and tonal separation over shadows.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 4,
+    "md": 8,
+    "lg": 12,
+    "pill": 999
+  },
+  "shadow_tier": 0,
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [
+      "Use solid surfaceSecondary with correct elevation for headers and bottom tabs. This is an operational, utility-first UI."
+    ],
+    "dont's": [
+      "No glassmorphism, blur, or heavy shadows. Avoid visual softness."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "solid surfaceSecondary",
+      "android": "solid surfaceSecondary",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Onboarding",
+      "purpose": "Role selection and login via Google for members or Portal for managers.",
+      "states": {
+        "loading": "Centered brand-colored spinner.",
+        "empty": "N/A",
+        "error": "Standard error toast."
+      },
+      "layout": "Full-bleed background image of gym interior with a strong vertical gradient scrim (transparent to 90% surface at bottom). Massive display typography 'PAUL FITNESS'. Stacked primary CTA (Google Sign in) and ghost secondary CTA (Manager Login) sticky at the bottom."
+    },
+    {
+      "name": "User Dashboard",
+      "purpose": "Primary member hub showing gym info, active plan status, and gym gallery.",
+      "states": {
+        "loading": "Skeleton cards.",
+        "empty": "Hero card showing 'NO ACTIVE PLAN' with red accent and 'View Plans' CTA.",
+        "error": "Error message with Retry button."
+      },
+      "layout": "Header with gym logo/name and contact details (tap to call). A massive operational metric card showing 'DAYS REMAINING' in Bebas Neue. Horizontal scrolling row of gym gallery photos. Sticky primary 'View Plans' CTA at the bottom if plan is expired or none exists."
+    },
+    {
+      "name": "Membership Plans",
+      "purpose": "List available gym plans (1/3/6/12 months) for selection.",
+      "states": {
+        "loading": "Spinner.",
+        "empty": "No plans available message.",
+        "error": "Retry loading plans."
+      },
+      "layout": "Stacked list of utility cards. Each card displays duration and price in large display font, with a 'Select' action. High contrast, sharp edges. Sticky 'Continue' CTA once a plan is selected."
+    },
+    {
+      "name": "Checkout",
+      "purpose": "Finalize membership payment via online gateway or cash at gym.",
+      "states": {
+        "loading": "Processing overlay.",
+        "empty": "N/A",
+        "error": "Payment failed toast."
+      },
+      "layout": "Order summary at the top (Plan name, amount). Two massive, equal-width structural buttons (or stacked if long text) at the bottom: 'Pay Online' (brandPrimary) and 'Pay Cash at Gym' (surfaceTertiary outline). Immediate and tactical."
+    },
+    {
+      "name": "Manager Dashboard",
+      "purpose": "Command center for the manager to view, search, and filter all gym members.",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "Illustration of clipboard with 'No Members Found'.",
+        "error": "Retry loading members."
+      },
+      "layout": "Sticky header with a search bar and horizontal scrolling filter chips (All, Active, Expiring, Expired). Dense, table-like list rows below showing member avatar, name, and a bold colored status pill. Fast scanning prioritized."
+    },
+    {
+      "name": "Member Detail (Manager View)",
+      "purpose": "Action center for a specific member (record cash, view history, call).",
+      "states": {
+        "loading": "Spinner.",
+        "empty": "N/A",
+        "error": "Retry."
+      },
+      "layout": "Profile header. Large metric card showing current plan status and expiry date. Sticky bottom section with primary 'Record Cash Payment' CTA and secondary 'Call Member' CTA (using brandTertiary background). Segmented control for switching between 'Overview' and 'Payment History'."
+    }
+  ],
+  "images": {
+    "onboarding_bg": {
+      "url": "https://images.pexels.com/photos/29392546/pexels-photo-29392546.jpeg",
+      "dark": "https://images.pexels.com/photos/29392546/pexels-photo-29392546.jpeg",
+      "alt": "Dark atmospheric gym interior"
+    },
+    "gym_hero": {
+      "url": "https://images.pexels.com/photos/29392549/pexels-photo-29392549.jpeg",
+      "alt": "Industrial gym staircase and dumbbells"
+    },
+    "gym_gallery_1": {
+      "url": "https://images.unsplash.com/photo-1637430308606-86576d8fef3c",
+      "alt": "Gym with row of exercise machines"
+    },
+    "gym_gallery_2": {
+      "url": "https://images.pexels.com/photos/17626039/pexels-photo-17626039.jpeg",
+      "alt": "Muscular man flexing in gym"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the Dark-First Utility DARK personality: deep obsidian backgrounds with strong Rust Red (#D72638) accents. Avoid pure black backgrounds.",
+    "Use Bebas Neue for all metrics, numbers, and display titles. Use DM Sans for body text, labels, and forms. Limit font weights to 400 and 500.",
+    "Do NOT use glassmorphism. This is a tactical, operational UI. Use solid surfaceSecondary for elevated components like sticky headers or bottom tabs.",
+    "For the Manager Dashboard, prioritize glanceability. Use a dense list layout with colored status pills (green, yellow, red) for member status.",
+    "Implement the 'Gradient Scrim' rule strictly for the Onboarding background image: use a vertical gradient from transparent to 80-90% surfaceInverse (#121212) at the bottom to ensure text readability.",
+    "Ensure 'Pay Cash at Gym' and 'Record Cash Payment' flows are heavily prominent for the manager and user respectively, as this is a core requirement for a local gym.",
+    "Add subtle haptic feedback to segmented controls, plan selection cards, and the 'Record Cash Payment' button.",
+    "No emojis in the UI. Use Phosphor icons with consistent weights."
+  ]
+}

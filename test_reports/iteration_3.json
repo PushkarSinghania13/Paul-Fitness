@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 3 backend testing for walk-in linking + /api/auth/phone merge. Created /app/backend/tests/test_iter3_link_merge.py with 9 new tests. Updated /app/backend/tests/test_manager_member_crud.py: duplicate-email test now asserts linked=true (was 409). Full suite: 44/44 PASSED (17 iter1 + 18 iter2 + 9 iter3). Verified: (1) POST /api/manager/members with matching email links to existing user (email priority over phone), preserves existing name, backfills missing phone, no duplicate created. (2) POST /api/manager/members with matching phone (no email match) links by phone, preserves existing email & name. (3) Empty name/phone on existing user get backfilled by walk-in payload. (4) Fresh email+phone creates a new walk-in (linked=false, walk_in=true). (5) After link, record-cash creates membership on linked user_id; GET /manager/members/{uid} shows it active; user count unchanged. (6) POST /api/auth/phone with matching walk-in phone: memberships transferred (modified_count returned as merged_memberships), walk-in user deleted, user_sessions & push_tokens for walk-in cleaned. (7) No walk-in match -> merged_memberships=0, no users deleted, phone still updated. (8) Manager-role user with same phone is NOT merged/deleted (role+walk_in filter respected). (9) Cascade safety verified for sessions + push_tokens after merge. (10) No _id leakage in any response body.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter3_link_merge.py",
+    "/app/backend/tests/test_manager_member_crud.py",
+    "/app/backend/tests/test_backend_api.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /api/auth/phone merge logic (lines 259-285): payload.phone is trusted as-is (only .strip()); no validation that phone is non-empty. If a user PATCHes phone='' (empty), the empty check on line 268 means no merge happens — fine, but the user record gets phone='' rather than null/unset. Consider Pydantic min_length=1 on UpdatePhone or strip empty -> None.",
+    "server.py /api/auth/phone (line 270): walk-in lookup filter uses role='user' AND walk_in=True. Good — prevents accidental merge with another Google account that happens to share the phone. However, two Google users sharing the same phone do NOT trigger any conflict warning. Consider warning or blocking on duplicate phone across Google users.",
+    "server.py /api/manager/members (POST, lines 502-505): email lookup also restricted to role='user'. Good. But the link path returns the existing user dict that may contain stale walk_in=true flag; if a Google-linked account later gets walk_in=true backfilled by lookup, future /api/auth/phone could pick it up unexpectedly. Consider clearing walk_in flag when a real Google login happens for that email.",
+    "server.py /api/manager/members POST: after linking, response includes existing user doc as-is — make sure password_hash is never present (Pydantic UserOut not used here). Currently safe because walk-in/Google users have no password_hash, but defense-in-depth: pop('password_hash') before returning.",
+    "Pre-existing iter2: @app.on_event lifecycle is deprecated; migrate to FastAPI lifespan.",
+    "Pre-existing iter2: /api/payments/order has no role guard; manager could call it. Low impact today since Razorpay disabled, but tighten before enabling."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter3_link_merge.py (new)",
+    "/app/backend/tests/test_manager_member_crud.py (duplicate-email test updated to assert link instead of 409)"
+  ],
+  "success_rate": {"backend": "100% (44/44 full suite, 9/9 new iter3)", "frontend": "N/A (backend-only requested)"},
+  "seed_data_creation": "Seeded Google-like users directly in Mongo (role='user', no walk_in flag) plus matching user_sessions tokens to simulate post-OAuth state for /api/auth/phone tests. Walk-in users created via POST /api/manager/members. All test data tracked in _created_user_ids list and torn down in module-scope autouse fixture; sessions tracked separately. Used unique phone numbers (90/91/92/93/94/95-prefixed + uuid hex) per test to avoid collisions.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Three pytest files: test_backend_api.py (17 iter1), test_manager_member_crud.py (18 iter2), test_iter3_link_merge.py (9 iter3). Run `pytest /app/backend/tests/ -v` for full regression (~8s). Iteration 3 changed walk-in duplicate-email semantics from 409 -> 200+linked=true. /api/auth/phone now performs merge: if a walk-in user (role=user, walk_in=true) has the same phone as the authenticated Google user's new phone, that walk-in's memberships, payment_orders move to the Google account and walk-in's users/user_sessions/push_tokens are deleted. Tests seed Google users directly via MongoDB because real OAuth requires emergentagent session_id. Manager phone is 07908283507 (seeded). Use unique phones per test to avoid interference.",
+  "rca_of_issue": "N/A - all features verified working as specified."
+}

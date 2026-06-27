@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 4 backend testing complete. Created /app/backend/tests/test_iter4_phone_otp_and_pwd.py with 21 new tests covering phone OTP request/verify, /api/auth/complete-profile, and /api/auth/manager/change-password. Full regression: 65/65 PASSED (17 iter1 + 18 iter2 + 9 iter3 + 21 iter4). Manager password verified RESTORED to 'Paul@Manager123' post-tests. Verified: (1) /api/auth/phone/request-otp returns ok+dev_otp(6-digit numeric)+message; subsequent request replaces previous code (DB has only latest); first code becomes invalid. (2) Short (<7 char) and whitespace-only phones return 400. (3) verify-otp with valid code returns ph_-prefixed session_token, user with phone, role=user, phone_signup=true, synth email phone_xxxxxxxxxx@paulfitness.local; is_new=true for new user, is_new=false for repeat. (4) Wrong code returns 400 and increments attempts (verified via DB inspection over 3 wrong tries). (5) attempts>=5 returns 429. (6) Expired OTP (manually set expires_at in past) returns 400 with 'expired' in detail. (7) verify-otp without prior request returns 400. (8) OTP is deleted on successful verify. (9) /api/auth/me with ph_ token returns the phone user with role=user, phone set, no _id leakage. (10) /api/auth/complete-profile without auth -> 401; with empty body -> 400; updates name & phone; merges walk-in (memberships transferred, walk-in deleted) with merged_memberships>=1. (11) /api/auth/manager/change-password without token -> 401; with non-manager token -> 403; new_password<8 chars -> 400; wrong current_password -> 401; correct flow updates hash, old password subsequently fails 401, new password succeeds; password restored at end and confirmed via login. (12) No _id leakage in any response body across all new endpoints. Note: on verify-otp with an existing walk-in matching the phone, the implementation reuses the walk-in (since walk-in has role=user) rather than creating a new user + merging — the user ends up logged in on the SAME user_id as the walk-in, memberships remain accessible via GET /memberships/me. Functionally equivalent to a merge, just no separate merge step happens. This is an acceptable, simpler path; flagged as a code-review observation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_phone_otp_and_pwd.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /api/auth/phone/verify-otp (lines 399-429): the user lookup `db.users.find_one({phone, role:'user'})` matches walk-in users too (since walk_in users have role='user'). Result: when a walk-in exists with the same phone, the phone signup REUSES that walk-in's user_id (is_new=false) and the subsequent walk-in merge block (lines 419-429) finds nothing else to merge. Functionally fine (memberships preserved, user can log in), but the spec language 'merges walk-in into resolved account, walk-in deleted' is technically false — no deletion happens because the walk-in IS the resolved user. The walk_in=true flag stays on the doc. Consider unsetting walk_in flag and updating phone_signup=true when this path is hit, so the user record correctly reflects 'self-claimed phone signup' instead of remaining a walk-in.",
+    "server.py /api/auth/phone/verify-otp: race condition on attempts counter — concurrent wrong-code verify-otp calls could let attempts exceed 5 before 429 is returned, since the check and increment are not atomic. Low priority for a single user flow.",
+    "server.py /api/auth/phone/request-otp: no rate limiting — same phone can request unlimited OTPs (each replaces previous). Consider min 30s cooldown between requests.",
+    "server.py /api/auth/manager/change-password (lines 264-276): does not invalidate existing manager sessions after password change. After a password rotation (e.g., suspected compromise), all old tokens remain valid until natural expiry (30 days). Recommend `await db.user_sessions.delete_many({user_id: manager['user_id'], session_token: {$ne: current_token}})` so other devices are logged out.",
+    "server.py /api/auth/complete-profile (lines 324-356): does not validate phone format (any non-empty stripped string accepted). Inconsistent with /api/auth/phone/request-otp which requires len>=7. Consider centralizing phone validation.",
+    "Pre-existing: @app.on_event lifecycle deprecated; migrate to FastAPI lifespan.",
+    "Pre-existing: /api/payments/order has no role guard."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_phone_otp_and_pwd.py (new, 21 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (65/65 full suite; 21/21 new iter4)",
+    "frontend": "N/A (backend-only requested)"
+  },
+  "seed_data_creation": "Per-test isolated phones generated as 99XXXXXXXX (uuid-derived) tracked in module-scope _created_phones list. Google-like users seeded directly in MongoDB (db.users + db.user_sessions) since real OAuth requires emergentagent session_id. Walk-in users created via POST /api/manager/members + record-cash for merge tests. Module-scope autouse fixture cleans up users, sessions, memberships, push_tokens, otps. Manager password explicitly RESTORED to Paul@Manager123 by the change-password test itself and re-verified post-suite via curl (status 200).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Four pytest files: test_backend_api.py (17 iter1), test_manager_member_crud.py (18 iter2), test_iter3_link_merge.py (9 iter3), test_iter4_phone_otp_and_pwd.py (21 iter4). Run `pytest /app/backend/tests/ -v` for full regression (~14s, 65 tests). NEW iter4 endpoints: POST /api/auth/phone/request-otp ({phone}) -> {ok, dev_otp, message} (MOCKED SMS - dev_otp is the 6-digit code; logged as '[OTP MOCK]' in backend); POST /api/auth/phone/verify-otp ({phone, code, name?}) -> {session_token (ph_*), user, is_new}; POST /api/auth/complete-profile ({name?, phone?}) auth-gated, returns {ok, user, merged_memberships}; POST /api/auth/manager/change-password ({current_password, new_password}) manager-only. OTPs stored in db.otps with TTL index on expires_at and code expires after 5 minutes. To test expiry, mutate db.otps.expires_at directly. To test 429, set db.otps.attempts=5. IMPORTANT: any test that changes the manager password MUST restore it (use the test_change_then_restore_password pattern in iter4 file). Note quirk: when a walk-in exists with phone X, phone-signup with X reuses the walk-in (is_new=false) instead of creating+merging — memberships stay on the same user_id and are accessible to the phone session.",
+  "rca_of_issue": "N/A - all features verified working as specified."
+}
