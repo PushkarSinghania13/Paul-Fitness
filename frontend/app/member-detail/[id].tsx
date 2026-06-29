@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linking,
-  TextInput, Modal, KeyboardAvoidingView, Platform,
+  TextInput, Modal, KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { colors, spacing, radius, displayStyle } from "@/src/theme";
@@ -35,6 +36,39 @@ export default function MemberDetail() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editPhoto, setEditPhoto] = useState<string | null>(null);
+
+  const pickMemberPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") { Alert.alert("Permission needed", "Allow photo library access."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [1, 1], quality: 0.6, base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setEditPhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const takeMemberPhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") { Alert.alert("Permission needed", "Allow camera access."); return; }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true, aspect: [1, 1], quality: 0.6, base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setEditPhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const onEditPhotoPress = () => {
+    Alert.alert("Member Photo", "Choose an option", [
+      { text: "Take Photo", onPress: takeMemberPhoto },
+      { text: "Choose from Library", onPress: pickMemberPhoto },
+      { text: "Remove Photo", onPress: () => setEditPhoto("remove"), style: "destructive" },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +104,7 @@ export default function MemberDetail() {
     if (!data) return;
     setEditName(data.user.name);
     setEditPhone(data.user.phone || "");
+    setEditPhoto(null);
     setEditMode(true);
   };
 
@@ -81,9 +116,10 @@ export default function MemberDetail() {
     setSaving(true);
     setFeedback(null);
     try {
+      const photoToSend = editPhoto === "remove" ? "" : (editPhoto || undefined);
       await api(`/manager/members/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: editName.trim(), phone: editPhone.trim() }),
+        body: JSON.stringify({ name: editName.trim(), phone: editPhone.trim(), picture: photoToSend }),
       });
       setEditMode(false);
       setFeedback("Member updated.");
@@ -145,6 +181,25 @@ export default function MemberDetail() {
         {editMode ? (
           <View style={styles.editCard} testID="edit-form">
             <Text style={styles.sectionLabel}>EDIT MEMBER</Text>
+            {/* Photo picker in edit mode */}
+            <View style={{ alignItems: "center", marginBottom: spacing.md }}>
+              <Pressable onPress={onEditPhotoPress} style={{ alignItems: "center" }}>
+                {editPhoto && editPhoto !== "remove" ? (
+                  <Image source={{ uri: editPhoto }} style={styles.editAvatar} />
+                ) : editPhoto === "remove" ? (
+                  <View style={[styles.editAvatar, { backgroundColor: colors.surface3, alignItems: "center", justifyContent: "center" }]}>
+                    <Ionicons name="person" color={colors.onSurface2} size={28} />
+                  </View>
+                ) : data?.user.picture ? (
+                  <Image source={{ uri: data.user.picture }} style={styles.editAvatar} />
+                ) : (
+                  <View style={[styles.editAvatar, { backgroundColor: colors.surface3, alignItems: "center", justifyContent: "center" }]}>
+                    <Ionicons name="person" color={colors.onSurface2} size={28} />
+                  </View>
+                )}
+                <Text style={{ color: colors.brand, fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 6 }}>CHANGE PHOTO</Text>
+              </Pressable>
+            </View>
             <Text style={styles.editLabel}>NAME</Text>
             <TextInput
               testID="edit-name-input"
@@ -373,6 +428,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg, marginBottom: spacing.lg,
   },
   editLabel: { color: colors.onSurface3, fontSize: 11, letterSpacing: 1.5, fontWeight: "800", marginBottom: 6, marginTop: spacing.md },
+  editAvatar: { width: 80, height: 80, borderRadius: 40 },
   editInput: {
     backgroundColor: colors.surface, color: colors.onSurface,
     paddingHorizontal: spacing.md, paddingVertical: 12, borderRadius: radius.md,

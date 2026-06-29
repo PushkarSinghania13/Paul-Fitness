@@ -1,7 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator,
+  TextInput, KeyboardAvoidingView, Platform, Alert,
+} from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { colors, spacing, radius, displayStyle } from "@/src/theme";
@@ -18,6 +22,7 @@ export default function Profile() {
   const { user, logout, refresh } = useAuth();
   const [phone, setPhone] = useState(user?.phone || "");
   const [savingPhone, setSavingPhone] = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +30,7 @@ export default function Profile() {
     try {
       const r = await api<{ history: HistoryItem[] }>("/memberships/me");
       setHistory(r.history);
-    } catch { /* silently ignore */ } finally { setLoading(false); }
+    } catch { } finally { setLoading(false); }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -39,6 +44,76 @@ export default function Profile() {
     } finally { setSavingPhone(false); }
   };
 
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow access to your photo library.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      await uploadPhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow camera access.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      await uploadPhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const uploadPhoto = async (base64: string) => {
+    setSavingPhoto(true);
+    try {
+      await api("/auth/profile/picture", {
+        method: "POST",
+        body: JSON.stringify({ picture: base64 }),
+      });
+      await refresh();
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to update photo");
+    } finally {
+      setSavingPhoto(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    setSavingPhoto(true);
+    try {
+      await api("/auth/profile/picture", {
+        method: "POST",
+        body: JSON.stringify({ picture: "" }),
+      });
+      await refresh();
+    } catch { } finally { setSavingPhoto(false); }
+  };
+
+  const onPhotoPress = () => {
+    Alert.alert("Profile Photo", "Choose an option", [
+      { text: "Take Photo", onPress: takePhoto },
+      { text: "Choose from Library", onPress: pickPhoto },
+      ...(user?.picture ? [{ text: "Remove Photo", onPress: removePhoto, style: "destructive" as const }] : []),
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.surface }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView
@@ -47,17 +122,31 @@ export default function Profile() {
       >
         <Text style={[displayStyle(28), { fontSize: 28, paddingHorizontal: spacing.lg, marginBottom: spacing.lg }]}>PROFILE</Text>
 
+        {/* Profile Card with photo */}
         <View style={styles.profileCard}>
-          {user?.picture ? (
-            <Image source={{ uri: user.picture }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: colors.surface3, alignItems: "center", justifyContent: "center" }]}>
-              <Ionicons name="person" color={colors.onSurface2} size={28} />
+          <Pressable onPress={onPhotoPress} style={styles.avatarWrapper}>
+            {savingPhoto ? (
+              <View style={[styles.avatar, { backgroundColor: colors.surface3, alignItems: "center", justifyContent: "center" }]}>
+                <ActivityIndicator color={colors.brand} />
+              </View>
+            ) : user?.picture ? (
+              <Image source={{ uri: user.picture }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.surface3, alignItems: "center", justifyContent: "center" }]}>
+                <Ionicons name="person" color={colors.onSurface2} size={28} />
+              </View>
+            )}
+            {/* Camera badge */}
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={12} color={colors.onSurface} />
             </View>
-          )}
+          </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.name} numberOfLines={1}>{user?.name}</Text>
             <Text style={styles.email} numberOfLines={1}>{user?.email}</Text>
+            <Pressable onPress={onPhotoPress}>
+              <Text style={styles.changePhotoText}>CHANGE PHOTO</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -126,9 +215,17 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg, padding: spacing.lg,
     backgroundColor: colors.surface2, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,
   },
-  avatar: { width: 56, height: 56, borderRadius: 28 },
+  avatarWrapper: { position: "relative" },
+  avatar: { width: 64, height: 64, borderRadius: 32 },
+  cameraBadge: {
+    position: "absolute", bottom: 0, right: 0,
+    backgroundColor: colors.brand, borderRadius: 10, width: 20, height: 20,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: colors.surface2,
+  },
   name: { color: colors.onSurface, fontSize: 17, fontWeight: "700" },
   email: { color: colors.onSurface3, fontSize: 13, marginTop: 2 },
+  changePhotoText: { color: colors.brand, fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 6 },
   section: { paddingHorizontal: spacing.lg, marginTop: spacing.xl },
   sectionLabel: { color: colors.onSurface3, fontSize: 11, fontWeight: "800", letterSpacing: 2, marginBottom: spacing.sm },
   hint: { color: colors.muted, fontSize: 12, marginBottom: spacing.sm },

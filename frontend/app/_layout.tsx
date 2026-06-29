@@ -22,7 +22,7 @@ function RootNav() {
     const inUserGroup = segments[0] === "(user)";
     const inManagerGroup = segments[0] === "(manager)";
     const isAuthFlow = segments[0] === "manager-login" || segments[0] === "phone-login";
-    const needsProfile = user?.role === "user" && (!user.phone || !user.name);
+    const needsProfile = user?.role === "user" && (!user.phone || !user.name || !user.picture);
 
     if (!user) {
       // Always redirect to login when logged out, unless already on login or auth screens

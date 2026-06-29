@@ -106,11 +106,19 @@ class WalkInMemberIn(BaseModel):
     name: str
     phone: str
     email: Optional[str] = None
+    picture: Optional[str] = None
 
 
 class MemberUpdateIn(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
+    picture: Optional[str] = None
+
+
+class PlanUpdateIn(BaseModel):
+    price_inr: Optional[int] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class PushTokenIn(BaseModel):
@@ -290,6 +298,17 @@ async def auth_logout(authorization: Optional[str] = Header(None)):
         token = authorization.replace("Bearer ", "").strip()
         await db.user_sessions.delete_one({"session_token": token})
     return {"ok": True}
+
+
+
+@api_router.post("/auth/profile/picture")
+async def update_profile_picture(payload: dict, authorization: Optional[str] = Header(None)):
+    session = await require_auth(authorization)
+    user_id = session["user_id"]
+    picture = payload.get("picture", "")
+    await db.users.update_one({"user_id": user_id}, {"$set": {"picture": picture}})
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"ok": True, "user": user}
 
 
 @api_router.post("/auth/phone")
@@ -710,6 +729,8 @@ async def manager_update_member(user_id: str, payload: MemberUpdateIn, authoriza
         updates["name"] = payload.name.strip()
     if payload.phone is not None:
         updates["phone"] = payload.phone.strip()
+    if payload.picture is not None:
+        updates["picture"] = payload.picture
     if not updates:
         raise HTTPException(status_code=400, detail="Nothing to update")
     await db.users.update_one({"user_id": user_id}, {"$set": updates})
@@ -727,6 +748,64 @@ async def manager_delete_member(user_id: str, authorization: Optional[str] = Hea
     await db.memberships.delete_many({"user_id": user_id})
     await db.user_sessions.delete_many({"user_id": user_id})
     await db.push_tokens.delete_many({"user_id": user_id})
+    return {"ok": True}
+
+
+
+@api_router.patch("/manager/plans/{plan_id}")
+async def manager_update_plan(plan_id: str, payload: PlanUpdateIn, authorization: Optional[str] = Header(None)):
+    await require_manager(authorization)
+    plan = await db.plans.find_one({"plan_id": plan_id}, {"_id": 0})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    updates = {}
+    if payload.price_inr is not None and payload.price_inr > 0:
+        updates["price_inr"] = payload.price_inr
+    if payload.name is not None and payload.name.strip():
+        updates["name"] = payload.name.strip()
+    if payload.description is not None:
+        updates["description"] = payload.description.strip()
+    if not updates:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    await db.plans.update_one({"plan_id": plan_id}, {"$set": updates})
+    plan = await db.plans.find_one({"plan_id": plan_id}, {"_id": 0})
+    return {"ok": True, "plan": plan}
+
+
+
+@api_router.post("/manager/plans")
+async def manager_create_plan(payload: dict, authorization: Optional[str] = Header(None)):
+    await require_manager(authorization)
+    name = (payload.get("name") or "").strip()
+    duration_months = payload.get("duration_months")
+    price_inr = payload.get("price_inr")
+    description = (payload.get("description") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Plan name is required")
+    if not duration_months or int(duration_months) <= 0:
+        raise HTTPException(status_code=400, detail="Valid duration is required")
+    if not price_inr or int(price_inr) <= 0:
+        raise HTTPException(status_code=400, detail="Valid price is required")
+    plan_id = f"plan_{uuid.uuid4().hex[:8]}"
+    plan = {
+        "plan_id": plan_id,
+        "name": name,
+        "duration_months": int(duration_months),
+        "price_inr": int(price_inr),
+        "description": description,
+    }
+    await db.plans.insert_one(plan)
+    plan.pop("_id", None)
+    return {"ok": True, "plan": plan}
+
+
+@api_router.delete("/manager/plans/{plan_id}")
+async def manager_delete_plan(plan_id: str, authorization: Optional[str] = Header(None)):
+    await require_manager(authorization)
+    plan = await db.plans.find_one({"plan_id": plan_id}, {"_id": 0})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    await db.plans.delete_one({"plan_id": plan_id})
     return {"ok": True}
 
 

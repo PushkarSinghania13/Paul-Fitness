@@ -6,12 +6,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radius, displayStyle } from "@/src/theme";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/src/auth";
 import { api } from "@/src/api";
 
 export default function ManagerProfile() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [showPwd, setShowPwd] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -84,6 +86,16 @@ export default function ManagerProfile() {
             <Text style={styles.callText}>079082 83507</Text>
           </Pressable>
         </View>
+
+        {/* Manage Plans */}
+        <Pressable
+          onPress={() => router.push("/manage-plans")}
+          style={({ pressed }) => [styles.pwdToggle, pressed && { opacity: 0.85 }]}
+        >
+          <Ionicons name="pricetag" size={18} color={colors.onSurface2} />
+          <Text style={styles.pwdToggleText}>MANAGE PLANS</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.onSurface3} />
+        </Pressable>
 
         {/* Change Password */}
         <Pressable

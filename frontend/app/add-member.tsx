@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator,
-  KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { colors, spacing, radius, displayStyle } from "@/src/theme";
@@ -15,9 +17,53 @@ export default function AddMember() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linkedInfo, setLinkedInfo] = useState<string | null>(null);
+
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow access to your photo library.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setPhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow camera access.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setPhoto(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const onPhotoPress = () => {
+    Alert.alert("Add Photo", "Choose an option", [
+      { text: "Take Photo", onPress: takePhoto },
+      { text: "Choose from Library", onPress: pickPhoto },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   const onSubmit = async () => {
     setError(null);
@@ -34,13 +80,13 @@ export default function AddMember() {
           name: name.trim(),
           phone: phone.trim(),
           email: email.trim() || undefined,
+          picture: photo || undefined,
         }),
       });
       if (r.linked) {
         setLinkedInfo(
           `This phone already belongs to ${r.user.name}'s account. Future cash payments will show up directly in their app.`
         );
-        // Brief pause so manager reads the linking message, then navigate.
         setTimeout(() => {
           router.replace({ pathname: "/member-detail/[id]", params: { id: r.user.user_id } });
         }, 1500);
@@ -60,7 +106,7 @@ export default function AddMember() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} testID="add-member-back">
+        <Pressable onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={26} color={colors.onSurface} />
         </Pressable>
         <Text style={styles.headerTitle}>ADD WALK-IN MEMBER</Text>
@@ -71,10 +117,29 @@ export default function AddMember() {
         <Text style={[displayStyle(32), { fontSize: 32, marginBottom: spacing.xs }]}>NEW MEMBER</Text>
         <Text style={styles.subtitle}>For members who joined at the gym without the app.</Text>
 
+        {/* Photo Picker */}
+        <View style={styles.photoSection}>
+          <Pressable onPress={onPhotoPress} style={({ pressed }) => [styles.photoBtn, pressed && { opacity: 0.8 }]}>
+            {photo ? (
+              <Image source={{ uri: photo }} style={styles.photoPreview} />
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={28} color={colors.muted} />
+                <Text style={styles.photoHint}>ADD PHOTO</Text>
+              </View>
+            )}
+          </Pressable>
+          {photo ? (
+            <Pressable onPress={() => setPhoto(null)} style={styles.removePhoto}>
+              <Ionicons name="close-circle" size={20} color={colors.brand2} />
+              <Text style={styles.removePhotoText}>REMOVE</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
         <View style={styles.field}>
           <Text style={styles.label}>FULL NAME *</Text>
           <TextInput
-            testID="walkin-name-input"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Rohit Sharma"
@@ -87,7 +152,6 @@ export default function AddMember() {
         <View style={styles.field}>
           <Text style={styles.label}>PHONE NUMBER *</Text>
           <TextInput
-            testID="walkin-phone-input"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
@@ -100,7 +164,6 @@ export default function AddMember() {
         <View style={styles.field}>
           <Text style={styles.label}>EMAIL (OPTIONAL)</Text>
           <TextInput
-            testID="walkin-email-input"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -109,19 +172,17 @@ export default function AddMember() {
             placeholderTextColor={colors.muted}
             style={styles.input}
           />
-          <Text style={styles.hint}>Leave blank if member doesn&apos;t have an email — we&apos;ll generate a placeholder.</Text>
         </View>
 
-        {error ? <Text style={styles.error} testID="add-member-error">{error}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
         {linkedInfo ? (
-          <View style={styles.linkedBanner} testID="linked-banner">
+          <View style={styles.linkedBanner}>
             <Ionicons name="link" size={18} color={colors.success} />
             <Text style={styles.linkedText}>{linkedInfo}</Text>
           </View>
         ) : null}
 
         <Pressable
-          testID="add-member-submit"
           onPress={onSubmit}
           disabled={busy}
           style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.85 }]}
@@ -145,13 +206,23 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "800", letterSpacing: 1.5 },
   subtitle: { color: colors.onSurface3, marginBottom: spacing.xl, fontSize: 13 },
+  photoSection: { alignItems: "center", marginBottom: spacing.xl },
+  photoBtn: { width: 100, height: 100, borderRadius: 50, overflow: "hidden" },
+  photoPreview: { width: 100, height: 100, borderRadius: 50 },
+  photoPlaceholder: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: colors.surface2, borderWidth: 2, borderColor: colors.border,
+    borderStyle: "dashed", alignItems: "center", justifyContent: "center", gap: 4,
+  },
+  photoHint: { color: colors.muted, fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  removePhoto: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: spacing.sm },
+  removePhotoText: { color: colors.brand2, fontSize: 11, fontWeight: "800", letterSpacing: 1 },
   field: { marginBottom: spacing.lg },
   label: { color: colors.onSurface3, fontSize: 11, letterSpacing: 1.5, marginBottom: 8, fontWeight: "800" },
   input: {
     backgroundColor: colors.surface2, color: colors.onSurface, paddingHorizontal: spacing.md,
     paddingVertical: 14, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, fontSize: 15,
   },
-  hint: { color: colors.muted, fontSize: 11, marginTop: 6 },
   error: { color: colors.brand2, marginBottom: spacing.md, fontSize: 13 },
   linkedBanner: {
     flexDirection: "row", gap: 10, alignItems: "flex-start",
