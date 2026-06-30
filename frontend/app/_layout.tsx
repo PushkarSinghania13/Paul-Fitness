@@ -43,7 +43,8 @@ function RootNav() {
       if (
         !inManagerGroup &&
         segments[0] !== "member-detail" &&
-        segments[0] !== "add-member"
+        segments[0] !== "add-member" &&
+        segments[0] !== "manage-plans"
       ) {
         router.replace("/(manager)");
       }
