@@ -695,6 +695,8 @@ async def manager_create_walkin(payload: WalkInMemberIn, authorization: Optional
             updates["phone"] = phone
         if not existing.get("name"):
             updates["name"] = name
+        if not existing.get("picture") and payload.picture:
+            updates["picture"] = payload.picture
         if updates:
             await db.users.update_one({"user_id": existing["user_id"]}, {"$set": updates})
             existing.update(updates)
@@ -708,7 +710,7 @@ async def manager_create_walkin(payload: WalkInMemberIn, authorization: Optional
         "email": email,
         "name": name,
         "phone": phone,
-        "picture": None,
+        "picture": payload.picture if payload.picture else None,
         "role": "user",
         "walk_in": True,
         "created_at": utcnow(),
