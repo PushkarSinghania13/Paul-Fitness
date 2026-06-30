@@ -303,12 +303,12 @@ async def auth_logout(authorization: Optional[str] = Header(None)):
 
 @api_router.post("/auth/profile/picture")
 async def update_profile_picture(payload: dict, authorization: Optional[str] = Header(None)):
-    session = await require_auth(authorization)
-    user_id = session["user_id"]
+    user = await get_user_by_token(authorization)
+    user_id = user["user_id"]
     picture = payload.get("picture", "")
     await db.users.update_one({"user_id": user_id}, {"$set": {"picture": picture}})
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    return {"ok": True, "user": user}
+    updated_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"ok": True, "user": updated_user}
 
 
 @api_router.post("/auth/phone")
