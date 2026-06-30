@@ -85,14 +85,22 @@ export default function CompleteProfile() {
     }
     setBusy(true);
     try {
-      // Save name and phone
-      const r = await api<{ ok: boolean; merged_memberships: number }>("/auth/complete-profile", {
-        method: "POST",
-        body: JSON.stringify({
-          name: needsName ? name.trim() : undefined,
-          phone: needsPhone ? phone.trim() : undefined,
-        }),
-      });
+      // Only call complete-profile if there's actually a name or phone to update
+      if (needsName || needsPhone) {
+        const r = await api<{ ok: boolean; merged_memberships: number }>("/auth/complete-profile", {
+          method: "POST",
+          body: JSON.stringify({
+            name: needsName ? name.trim() : undefined,
+            phone: needsPhone ? phone.trim() : undefined,
+          }),
+        });
+
+        if (r.merged_memberships > 0) {
+          setLinkedNote(
+            `We found ${r.merged_memberships} payment${r.merged_memberships > 1 ? "s" : ""} the manager already recorded for this number — they're now in your account.`
+          );
+        }
+      }
 
       // Save photo if needed
       if (needsPhoto && photo) {
@@ -102,10 +110,7 @@ export default function CompleteProfile() {
         });
       }
 
-      if (r.merged_memberships > 0) {
-        setLinkedNote(
-          `We found ${r.merged_memberships} payment${r.merged_memberships > 1 ? "s" : ""} the manager already recorded for this number — they're now in your account.`
-        );
+      if (linkedNote) {
         setTimeout(() => refresh(), 1500);
       } else {
         await refresh();
